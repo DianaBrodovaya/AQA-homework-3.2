@@ -1,57 +1,68 @@
 package ru.netology.test;
 
 import lombok.val;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.netology.data.DataHelper;
 import ru.netology.page.LoginPage;
-
-import java.sql.SQLException;
 
 import static com.codeborne.selenide.Selenide.open;
 
 public class LoginTest {
 
     @BeforeEach
-    void setUp() {
+    public void openPage() {
         open("http://localhost:9999");
     }
 
+    @AfterAll
+    public static void CleanAllTables() {
+        DataHelper.cleanDataBase();
+    }
+
     @Test
-    void shouldBeLogin() throws SQLException {
-        DataHelper.cleanCodes();
+    public void shouldBeLogin() {
         val loginPage = new LoginPage();
         val authInfo = DataHelper.getAuthInfo();
-        val verificationPage = loginPage.login(authInfo);
-        val verificationCode = DataHelper.getVerificationCode(authInfo);
-        val dashboardPage = verificationPage.verify(verificationCode);
+        val verificationPage = loginPage.validLogin(authInfo);
+        val verificationCode = DataHelper.getVerificationCode();
+        val dashboardPage = verificationPage.validVerify(verificationCode);
         dashboardPage.checkPage();
     }
 
     @Test
-    void shouldNotLoginWithInvalidVerification() throws SQLException {
-        DataHelper.cleanCodes();
+    public void shouldNotLoginWithInvalidUser() {
+        val loginPage = new LoginPage();
+        val authInfo = DataHelper.getInvalidLogin();
+        loginPage.invalidLogin(authInfo);
+    }
+
+    @Test
+    public void shouldNotLoginWithInvalidPassword() {
+        val loginPage = new LoginPage();
+        val authInfo = DataHelper.getInvalidPassword();
+        loginPage.invalidLogin(authInfo);
+    }
+
+    @Test
+    public void shouldNotLoginWithInvalidVerificationCode() {
         val loginPage = new LoginPage();
         val authInfo = DataHelper.getAuthInfo();
-        val verificationPage = loginPage.login(authInfo);
-        val verificationCodeInvalid = DataHelper.getInvalidCode();
-        verificationPage.verify(verificationCodeInvalid);
-        verificationPage.checkErrorCode();
+        val verificationPage = loginPage.validLogin(authInfo);
+        val verificationCode = DataHelper.getInvalidVerificationCode();
+        verificationPage.invalidVerify(verificationCode.getCode());
     }
 
     @Test
-    void shouldNotLoginWithInvalidUser() {
+    public void shouldBlockUser() {
         val loginPage = new LoginPage();
-        val authInfo = DataHelper.getAuthInfoInvalid();
-        loginPage.login(authInfo);
-        loginPage.checkErrorLoginOrPassword();
-    }
-
-    @Test
-    void shouldNotLoginWithInvalidPassword() {
-        val loginPage = new LoginPage();
-        val authInfo = DataHelper.getAuthInfoVasyaWithInvalidPassword();
-        loginPage.login(authInfo);
-        loginPage.checkErrorLoginOrPassword();
+        val authInfo = DataHelper.getInvalidPassword();
+        loginPage.invalidLogin(authInfo);
+        loginPage.cleanLoginPageFields();
+        loginPage.invalidLogin(authInfo);
+        loginPage.cleanLoginPageFields();
+        loginPage.invalidLogin(authInfo);
+        loginPage.userLockedMessages();
     }
 }

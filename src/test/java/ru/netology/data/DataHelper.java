@@ -2,43 +2,38 @@ package ru.netology.data;
 
 import com.github.javafaker.Faker;
 import lombok.Value;
+import lombok.val;
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.ScalarHandler;
 
-import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DataHelper {
-    private DataHelper(){}
-    private static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(
-                "jdbc:mysql://localhost:3306/app", "app", "pass"
-        );
-    }
 
-    private static String getUserId(AuthInfo authInfo) throws SQLException {
-        String getUserIdSQL = "SELECT id FROM users WHERE login = ?";
-        QueryRunner runner = new QueryRunner();
-        return runner.query(getConnection(), getUserIdSQL, new ScalarHandler<>(), authInfo.getLogin());
+    private static String jdbcUrl = "jdbc:mysql://localhost:3306/app";
+    private static String user = "app";
+    private static String password = "pass";
+
+    private DataHelper() {
     }
 
     @Value
-    public static class AuthInfo{
-        private String login;
-        private String password;
+    public static class AuthInfo {
+        String login;
+        String password;
     }
 
     public static AuthInfo getAuthInfo() {
         return new AuthInfo("vasya", "qwerty123");
     }
 
-    public static AuthInfo getAuthInfoInvalid() {
+    public static AuthInfo getInvalidLogin() {
         Faker faker = new Faker();
-        return new AuthInfo(faker.name().username(), faker.internet().password());
+        return new AuthInfo(faker.name().username(), "qwerty123");
     }
 
-    public static AuthInfo getAuthInfoVasyaWithInvalidPassword(){
+    public static AuthInfo getInvalidPassword() {
         Faker faker = new Faker();
         return new AuthInfo("vasya", faker.internet().password());
     }
@@ -48,22 +43,40 @@ public class DataHelper {
         private String code;
     }
 
-    public static VerificationCode getInvalidCode() {
+    public static String getVerificationCode() {
+        val queryAuthCodeInSQL = "SELECT code FROM auth_codes WHERE created >= DATE_SUB(NOW() , INTERVAL 1 SECOND);";
+        val runner = new QueryRunner();
+        try (
+                val conn = DriverManager.getConnection(jdbcUrl, user, password)
+        ) {
+            val authCode = runner.query(conn, queryAuthCodeInSQL, new ScalarHandler<>());
+            return (String) authCode;
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        return null;
+    }
+
+    public static VerificationCode getInvalidVerificationCode() {
         Faker faker = new Faker();
         return new VerificationCode(String.valueOf(faker.random().nextInt(10000, 999999)));
     }
 
-    public static VerificationCode getVerificationCode(AuthInfo authInfo) throws SQLException {
-        String userId = getUserId(authInfo);
-        String getVerificationCodeSQL = "SELECT code FROM auth_codes WHERE user_id = ?";
-        QueryRunner runner = new QueryRunner();
-        String code = runner.query(getConnection(), getVerificationCodeSQL, new ScalarHandler<>(), userId);
-        return new VerificationCode(code);
-    }
-
-    public static void cleanCodes() throws SQLException {
-        String cleanVerificationCodeSQL = "DELETE FROM auth_codes";
-        QueryRunner runner = new QueryRunner();
-        runner.execute(getConnection(), cleanVerificationCodeSQL);
+    public static void cleanDataBase() {
+        val runner = new QueryRunner();
+        val deleteUsers = "DELETE FROM users";
+        val deleteCards = "DELETE FROM cards";
+        val deleteAuthCodes = "DELETE FROM auth_codes";
+        val deleteCardTrans = "DELETE FROM card_transactions";
+        try (
+                val conn = DriverManager.getConnection(jdbcUrl, user, password)
+        ) {
+            runner.update(conn, deleteCardTrans);
+            runner.update(conn, deleteAuthCodes);
+            runner.update(conn, deleteCards);
+            runner.update(conn, deleteUsers);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
     }
 }
